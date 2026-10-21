@@ -1,6 +1,7 @@
 import streamlit as st
 import folium
 from streamlit_folium import st_folium
+import json
 
 # Configurazione base della pagina Streamlit
 st.set_page_config(page_title="Ormeggi Trieste", layout="wide")
@@ -23,6 +24,23 @@ def crea_mappa():
         tiles="OpenStreetMap"
     )
     
+    # Carica e disegna le geometrie delle banchine dal file GeoJSON
+    try:
+        with open("banchine.geojson", "r", encoding="utf-8") as f:
+            geojson_data = json.load(f)
+            
+        folium.GeoJson(
+            geojson_data,
+            name="Banchine Storiche",
+            style_function=lambda feature: {
+                "color": "black",
+                "weight": 2.5,
+                "opacity": 1
+            }
+        ).add_to(m)
+    except FileNotFoundError:
+        st.error("Errore: il file banchine.geojson non è stato trovato. Assicurati di averlo caricato su GitHub.")
+        
     return m
 
 # Crea l'oggetto mappa
