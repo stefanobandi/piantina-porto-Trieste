@@ -10,7 +10,7 @@ st.set_page_config(page_title="Ormeggi Trieste", layout="wide")
 st.title("Planimetria Sinottica Ormeggi - Porto di Trieste")
 
 # Banner di avviso (Lavori in corso)
-st.warning("⚠️ **Lavori in corso:** Questa applicazione è in fase di sviluppo iniziale. I dati, le planimetrie e le posizioni degli ormeggi non sono ancora definitivi e non devono essere usati per scopi operativi o di navigazione.")
+st.warning("⚠️ **Lavori in corso:** Questa applicazione è in fase di sviluppo iniziale. Confronto tra tracciato Excel e geometrie reali.")
 
 # Coordinate centrali del porto di Trieste
 TRIESTE_LAT = 45.645
@@ -24,27 +24,48 @@ def crea_mappa():
         tiles="OpenStreetMap"
     )
     
-    # Carica e disegna le geometrie delle banchine dal file GeoJSON
+    # 1. Carica e disegna le BANCHINE VECCHIE (Il tuo Excel - Linea Nera)
     try:
         with open("banchine.geojson", "r", encoding="utf-8") as f:
-            geojson_data = json.load(f)
+            banchine_vecchie = json.load(f)
             
         folium.GeoJson(
-            geojson_data,
-            name="Banchine Storiche",
+            banchine_vecchie,
+            name="Tracciato Storico Excel (Nero)",
             style_function=lambda feature: {
                 "color": "black",
-                "weight": 2.5,
+                "weight": 3,
                 "opacity": 1
             }
         ).add_to(m)
     except FileNotFoundError:
-        st.error("Errore: il file banchine.geojson non è stato trovato. Assicurati di averlo caricato su GitHub.")
+        st.error("File banchine.geojson non trovato.")
+
+    # 2. Carica e disegna la COSTA REALE (Dati OpenStreetMap - Poligoni Blu)
+    try:
+        with open("costa_trieste.geojson", "r", encoding="utf-8") as f:
+            costa_reale = json.load(f)
+            
+        folium.GeoJson(
+            costa_reale,
+            name="Costa Reale OSM (Blu)",
+            style_function=lambda feature: {
+                "fillColor": "#0284c7", # Blu elettrico
+                "color": "#0284c7",
+                "weight": 1.5,
+                "fillOpacity": 0.4
+            }
+        ).add_to(m)
+    except FileNotFoundError:
+        st.error("File costa_trieste.geojson non trovato.")
+
+    # Aggiunge il selettore dei livelli (Layer Control) in alto a destra
+    folium.LayerControl().add_to(m)
         
     return m
 
 # Crea l'oggetto mappa
 mappa = crea_mappa()
 
-# Visualizza la mappa nell'app Streamlit occupando tutta la larghezza
+# Visualizza la mappa nell'app Streamlit
 st_folium(mappa, width="100%", height=750)
