@@ -8,16 +8,19 @@ st.set_page_config(page_title="Ormeggi Trieste", layout="wide")
 # Titolo dell'applicazione
 st.title("Planimetria Sinottica Ormeggi - Porto di Trieste")
 
+# Banner di avviso (Lavori in corso)
+st.warning("⚠️ **Lavori in corso:** Questa applicazione è in fase di sviluppo iniziale. I dati, le planimetrie e le posizioni degli ormeggi non sono ancora definitivi e non devono essere usati per scopi operativi o di navigazione.")
+
 # Coordinate centrali del porto di Trieste (circa al centro della baia)
 TRIESTE_LAT = 45.645
 TRIESTE_LON = 13.760
 
 def crea_mappa():
-    # Inizializza la mappa con un tile layer pulito (CartoDB positron è ottimo per schemi tecnici)
+    # Inizializza la mappa. Sostituito CartoDB con OpenStreetMap per risolvere l'errore API KEY REQUIRED
     m = folium.Map(
         location=[TRIESTE_LAT, TRIESTE_LON], 
         zoom_start=14, 
-        tiles="CartoDB positron"
+        tiles="OpenStreetMap"
     )
     
     # Marker temporaneo di test per confermare il corretto caricamento
