@@ -11,24 +11,17 @@ st.title("Planimetria Sinottica Ormeggi - Porto di Trieste")
 # Banner di avviso (Lavori in corso)
 st.warning("⚠️ **Lavori in corso:** Questa applicazione è in fase di sviluppo iniziale. I dati, le planimetrie e le posizioni degli ormeggi non sono ancora definitivi e non devono essere usati per scopi operativi o di navigazione.")
 
-# Coordinate centrali del porto di Trieste (circa al centro della baia)
+# Coordinate centrali del porto di Trieste
 TRIESTE_LAT = 45.645
 TRIESTE_LON = 13.760
 
 def crea_mappa():
-    # Inizializza la mappa. Sostituito CartoDB con OpenStreetMap per risolvere l'errore API KEY REQUIRED
+    # Inizializza la mappa con OpenStreetMap
     m = folium.Map(
         location=[TRIESTE_LAT, TRIESTE_LON], 
         zoom_start=14, 
         tiles="OpenStreetMap"
     )
-    
-    # Marker temporaneo di test per confermare il corretto caricamento
-    folium.Marker(
-        [45.645, 13.760],
-        popup="Centro Porto di Trieste",
-        tooltip="Mappa base caricata correttamente"
-    ).add_to(m)
     
     return m
 
