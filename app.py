@@ -17,14 +17,30 @@ TRIESTE_LAT = 45.645
 TRIESTE_LON = 13.760
 
 def crea_mappa():
-    # Inizializza la mappa con OpenStreetMap
+    # Inizializza la mappa senza tile predefinito per gestire la selezione dello sfondo
     m = folium.Map(
         location=[TRIESTE_LAT, TRIESTE_LON], 
         zoom_start=14, 
-        tiles="OpenStreetMap"
+        tiles=None
     )
     
-    # 1. Carica e disegna le BANCHINE VECCHIE (Il tuo Excel - Linea Nera)
+    # 1. LIVELLI DI SFONDO (BASEMAPS)
+    # Mappa stradale OpenStreetMap
+    folium.TileLayer(
+        tiles="OpenStreetMap",
+        name="OpenStreetMap (Mappa reale)",
+        show=True
+    ).add_to(m)
+    
+    # Sfondo neutro trasparente/bianco (per vedere solo il disegno tecnico vettoriale)
+    folium.TileLayer(
+        tiles="CartoDB PositronNoLabels",
+        name="Sfondo Bianco (Solo Vettoriale)",
+        attr='&copy; <a href="https://carto.com/">CartoDB</a>',
+        show=False
+    ).add_to(m)
+
+    # 2. BANCHINE VECCHIE (Il tuo Excel - Linea Nera)
     try:
         with open("banchine.geojson", "r", encoding="utf-8") as f:
             banchine_vecchie = json.load(f)
@@ -32,6 +48,7 @@ def crea_mappa():
         folium.GeoJson(
             banchine_vecchie,
             name="Tracciato Storico Excel (Nero)",
+            show=True,
             style_function=lambda feature: {
                 "color": "black",
                 "weight": 3,
@@ -41,7 +58,7 @@ def crea_mappa():
     except FileNotFoundError:
         st.error("File banchine.geojson non trovato.")
 
-    # 2. Carica e disegna la COSTA REALE (Dati OpenStreetMap - Poligoni Blu)
+    # 3. COSTA REALE (Dati OpenStreetMap - Poligoni Blu)
     try:
         with open("costa_trieste.geojson", "r", encoding="utf-8") as f:
             costa_reale = json.load(f)
@@ -49,8 +66,9 @@ def crea_mappa():
         folium.GeoJson(
             costa_reale,
             name="Costa Reale OSM (Blu)",
+            show=True,
             style_function=lambda feature: {
-                "fillColor": "#0284c7", # Blu elettrico
+                "fillColor": "#0284c7",
                 "color": "#0284c7",
                 "weight": 1.5,
                 "fillOpacity": 0.4
@@ -59,8 +77,8 @@ def crea_mappa():
     except FileNotFoundError:
         st.error("File costa_trieste.geojson non trovato.")
 
-    # Aggiunge il selettore dei livelli (Layer Control) in alto a destra
-    folium.LayerControl().add_to(m)
+    # Aggiunge il selettore dei livelli in alto a destra
+    folium.LayerControl(collapsed=False).add_to(m)
         
     return m
 
