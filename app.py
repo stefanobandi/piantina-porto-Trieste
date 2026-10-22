@@ -3,17 +3,29 @@ import folium
 from folium.plugins import MeasureControl
 from streamlit_folium import st_folium
 import json
+import re
 
 st.set_page_config(page_title="Ormeggi Trieste", layout="wide")
 
-# --- GESTIONE STATO SESSIONE ---
-if 'scelta_ormeggio' not in st.session_state:
-    st.session_state.scelta_ormeggio = "--- Vista Generale ---"
-
+# --- FUNZIONI DI SUPPORTO ---
 def ricentra_mappa():
     st.session_state.scelta_ormeggio = "--- Vista Generale ---"
+    st.session_state.scelta_coord = ""
 
-# --- LETTURA DATI ---
+def parse_coords(coord_str):
+    # Cerca due numeri decimali (latitudine e longitudine) separati da spazio o virgola
+    match = re.search(r'([+-]?\d+\.\d+)[\s,]+([+-]?\d+\.\d+)', coord_str)
+    if match:
+        return float(match.group(1)), float(match.group(2))
+    return None
+
+# --- INIZIALIZZAZIONE STATO SESSIONE ---
+if 'scelta_ormeggio' not in st.session_state:
+    st.session_state.scelta_ormeggio = "--- Vista Generale ---"
+if 'scelta_coord' not in st.session_state:
+    st.session_state.scelta_coord = ""
+
+# --- LETTURA DATI ETICHETTE ---
 dati_etichette = {}
 try:
     with open("etichette.geojson", "r", encoding="utf-8") as f:
@@ -25,28 +37,40 @@ try:
 except FileNotFoundError:
     pass
 
-# --- BARRA LATERALE ---
+# --- BARRA LATERALE (SIDEBAR) ---
 st.sidebar.title("⚓ Strumenti Porto")
 st.sidebar.markdown("---")
 
-st.sidebar.subheader("🔍 Cerca Ormeggio")
-lista_nomi = sorted(list(dati_etichette.keys()))
-lista_nomi.insert(0, "--- Vista Generale ---")
+modalita_ricerca = st.sidebar.radio("Modalità di Ricerca:", ["Per Nome", "Per Coordinate (Lat, Lon)"])
 
-scelta = st.sidebar.selectbox("Seleziona dalla lista:", lista_nomi, key="scelta_ormeggio")
+# Logica di ricerca combinata
+coord_ricercate = None
+
+if modalita_ricerca == "Per Nome":
+    lista_nomi = sorted(list(dati_etichette.keys()))
+    lista_nomi.insert(0, "--- Vista Generale ---")
+    scelta = st.sidebar.selectbox("Seleziona dalla lista:", lista_nomi, key="scelta_ormeggio")
+    if scelta != "--- Vista Generale ---":
+        coord_ricercate = dati_etichette[scelta]
+else:
+    testo_coord = st.sidebar.text_input("Es. 45.645, 13.760", key="scelta_coord")
+    if testo_coord:
+        coord_ricercate = parse_coords(testo_coord)
+        if not coord_ricercate:
+            st.sidebar.error("Formato non valido. Usa i gradi decimali separati da virgola.")
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("📍 Controlli Mappa")
-st.sidebar.button("🎯 Ricentra Vista", on_click=ricentra_mappa)
+st.sidebar.button("🎯 Ricentra Vista Globale", on_click=ricentra_mappa)
 
-st.sidebar.info("📏 **Misurazioni:** Usa l'icona del righello in alto a destra.")
+st.sidebar.info("📏 **Misurazioni:** Usa l'icona del righello in alto a destra. Le distanze sono espresse direttamente in Miglia Nautiche (NM) e Metri.")
 
-# --- IMPOSTAZIONE CENTRO ---
-if st.session_state.scelta_ormeggio != "--- Vista Generale ---":
-    START_LAT, START_LON = dati_etichette[st.session_state.scelta_ormeggio]
-    START_ZOOM = 17
+# --- IMPOSTAZIONE CENTRO MAPPA ---
+if coord_ricercate:
+    START_LAT, START_LON = coord_ricercate
+    START_ZOOM = 17 # Zoom profondo sul punto cercato
 else:
-    START_LAT, START_LON = 45.645, 13.760
+    START_LAT, START_LON = 45.645, 13.760 # Centro del golfo
     START_ZOOM = 14
 
 st.title("Planimetria Sinottica Ormeggi - Porto di Trieste")
@@ -58,18 +82,17 @@ def crea_mappa():
     folium.TileLayer(tiles="OpenStreetMap", name="OpenStreetMap", show=True).add_to(m)
     folium.TileLayer(tiles="", attr="Sfondo Neutro", name="Sfondo Bianco (Solo Vettoriale)", show=False).add_to(m)
 
-    # 2. Strumento Misurazione (Metri e Miglia Nautiche)
+    # 2. Strumento Misurazione (NM Forzato come Primario)
     m.add_child(MeasureControl(
         position='topright', 
-        primary_length_unit='meters', 
-        secondary_length_unit='nauticalMiles',
+        primary_length_unit='nauticalMiles', 
+        secondary_length_unit='meters',
         primary_area_unit='sqmeters',
-        secondary_area_unit=None,
         customUnits={
             'nauticalMiles': {
                 'factor': 0.0005399568,
                 'display': 'NM',
-                'decimals': 2
+                'decimals': 3
             }
         }
     ))
@@ -87,7 +110,7 @@ def crea_mappa():
     except FileNotFoundError:
         pass
 
-    # 4. Etichette smistate
+    # 4. Etichette e Pallini
     fg_moli = folium.FeatureGroup(name="Etichette: Moli e Banchine", show=True)
     fg_ormeggi = folium.FeatureGroup(name="Etichette: Numeri Ormeggio", show=True)
     fg_contorno = folium.FeatureGroup(name="Etichette: Punti di Riferimento", show=False)
@@ -125,8 +148,8 @@ def crea_mappa():
     fg_ormeggi.add_to(m)
     fg_contorno.add_to(m)
 
-    # 5. Evidenziatore Ricerca
-    if st.session_state.scelta_ormeggio != "--- Vista Generale ---":
+    # 5. Evidenziatore Ricerca (Attivo sia per nomi che per coordinate)
+    if coord_ricercate:
         folium.CircleMarker(
             location=[START_LAT, START_LON],
             radius=20,
