@@ -6,16 +6,14 @@ import json
 
 st.set_page_config(page_title="Ormeggi Trieste", layout="wide")
 
-# --- GESTIONE STATO SESSIONE PER IL PULSANTE ---
-# Inizializza la variabile di stato per la ricerca se non esiste
+# --- GESTIONE STATO SESSIONE ---
 if 'scelta_ormeggio' not in st.session_state:
     st.session_state.scelta_ormeggio = "--- Vista Generale ---"
 
 def ricentra_mappa():
-    # Questa funzione viene chiamata quando si clicca il bottone
     st.session_state.scelta_ormeggio = "--- Vista Generale ---"
 
-# --- LETTURA DATI PER LA RICERCA ---
+# --- LETTURA DATI ---
 dati_etichette = {}
 try:
     with open("etichette.geojson", "r", encoding="utf-8") as f:
@@ -27,7 +25,7 @@ try:
 except FileNotFoundError:
     pass
 
-# --- BARRA LATERALE (SIDEBAR) ---
+# --- BARRA LATERALE ---
 st.sidebar.title("⚓ Strumenti Porto")
 st.sidebar.markdown("---")
 
@@ -35,50 +33,48 @@ st.sidebar.subheader("🔍 Cerca Ormeggio")
 lista_nomi = sorted(list(dati_etichette.keys()))
 lista_nomi.insert(0, "--- Vista Generale ---")
 
-# Colleghiamo il selectbox alla variabile di sessione
 scelta = st.sidebar.selectbox("Seleziona dalla lista:", lista_nomi, key="scelta_ormeggio")
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("📍 Controlli Mappa")
 st.sidebar.button("🎯 Ricentra Vista", on_click=ricentra_mappa)
 
-st.sidebar.info("📏 **Misurazioni:** Usa l'icona del righello in alto a destra sulla mappa per tracciare segmenti e misurare le distanze in metri.")
+st.sidebar.info("📏 **Misurazioni:** Usa l'icona del righello in alto a destra.")
 
-# --- IMPOSTAZIONE CENTRO MAPPA ---
+# --- IMPOSTAZIONE CENTRO ---
 if st.session_state.scelta_ormeggio != "--- Vista Generale ---":
     START_LAT, START_LON = dati_etichette[st.session_state.scelta_ormeggio]
-    START_ZOOM = 17 # Zoom stretto sull'ormeggio
+    START_ZOOM = 17
 else:
-    START_LAT, START_LON = 45.645, 13.760 # Centro del porto
+    START_LAT, START_LON = 45.645, 13.760
     START_ZOOM = 14
 
-# --- TITOLO PRINCIPALE ---
 st.title("Planimetria Sinottica Ormeggi - Porto di Trieste")
 
 def crea_mappa():
     m = folium.Map(location=[START_LAT, START_LON], zoom_start=START_ZOOM, tiles=None)
     
-    # 1. Livelli di Sfondo
+    # 1. Livelli Sfondo
     folium.TileLayer(tiles="OpenStreetMap", name="OpenStreetMap", show=True).add_to(m)
     folium.TileLayer(tiles="", attr="Sfondo Neutro", name="Sfondo Bianco (Solo Vettoriale)", show=False).add_to(m)
 
-    # 2. Strumento Misurazione
-    m.add_child(MeasureControl(position='topright', primary_length_unit='meters', primary_area_unit='sqmeters'))
+    # 2. Strumento Misurazione (Metri e Miglia Nautiche)
+    m.add_child(MeasureControl(
+        position='topright', 
+        primary_length_unit='meters', 
+        secondary_length_unit='nauticalMiles',
+        primary_area_unit='sqmeters',
+        secondary_area_unit=None,
+        customUnits={
+            'nauticalMiles': {
+                'factor': 0.0005399568,
+                'display': 'NM',
+                'decimals': 2
+            }
+        }
+    ))
 
-    # 3. Banchine Vecchie
-    try:
-        with open("banchine.geojson", "r", encoding="utf-8") as f:
-            banchine_vecchie = json.load(f)
-        folium.GeoJson(
-            banchine_vecchie,
-            name="Tracciato Storico Excel (Nero)",
-            show=False,
-            style_function=lambda feature: {"color": "black", "weight": 3, "opacity": 1}
-        ).add_to(m)
-    except FileNotFoundError:
-        pass
-
-    # 4. Costa Reale
+    # 3. Costa Reale
     try:
         with open("costa_trieste.geojson", "r", encoding="utf-8") as f:
             costa_reale = json.load(f)
@@ -91,7 +87,7 @@ def crea_mappa():
     except FileNotFoundError:
         pass
 
-    # 5. Etichette e Pallini
+    # 4. Etichette smistate
     fg_moli = folium.FeatureGroup(name="Etichette: Moli e Banchine", show=True)
     fg_ormeggi = folium.FeatureGroup(name="Etichette: Numeri Ormeggio", show=True)
     fg_contorno = folium.FeatureGroup(name="Etichette: Punti di Riferimento", show=False)
@@ -108,16 +104,14 @@ def crea_mappa():
         else:
             target_group = fg_contorno
         
-        # Aggiunge il pallino rosso per indicare il punto esatto
         folium.CircleMarker(
             location=[lat, lon],
             radius=3,
-            color="#b91c1c", # Rosso scuro
+            color="#b91c1c",
             fill=True,
             fill_opacity=1
         ).add_to(target_group)
         
-        # Aggiunge il testo spostato leggermente in basso a destra (icon_anchor) per non coprire il pallino
         folium.map.Marker(
             [lat, lon],
             icon=folium.DivIcon(
@@ -131,9 +125,8 @@ def crea_mappa():
     fg_ormeggi.add_to(m)
     fg_contorno.add_to(m)
 
-    # 6. EVIDENZIATORE RICERCA
+    # 5. Evidenziatore Ricerca
     if st.session_state.scelta_ormeggio != "--- Vista Generale ---":
-        # Disegna un cerchio rosso grande e trasparente attorno al punto cercato
         folium.CircleMarker(
             location=[START_LAT, START_LON],
             radius=20,
@@ -144,7 +137,6 @@ def crea_mappa():
             fill_opacity=0.3
         ).add_to(m)
 
-    # Aggiunge il selettore dei livelli
     folium.LayerControl(collapsed=False).add_to(m)
     return m
 
